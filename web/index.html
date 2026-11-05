@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Share</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .btn:hover {
+            opacity: 0.9;
+        }
+        
+        .qr-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+        
+        .qr-code {
+            max-width: 250px;
+            margin: 10px auto;
+            display: block;
+        }
+        
+        .file-list {
+            list-style: none;
+        }
+        
+        .file-item {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .file-item:hover {
+            background: #f5f5f5;
+        }
+        
+        .file-name {
+            flex: 1;
+            cursor: pointer;
+        }
+        
+        .download-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .upload-area {
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            margin-top: 20px;
+            cursor: pointer;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .security-badge {
+            background: #4CAF50;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: inline-block;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔒 Secure Share</h1>
+            <p>Private, encrypted file sharing over local network</p>
+            <span class="security-badge">✓ No internet • ✓ End-to-end local • ✓ No telemetry</span>
+        </div>
+        
+        <!-- Session Creation -->
+        <div id="createSession" class="card">
+            <h2>Create Sharing Session</h2>
+            <p style="margin-top: 10px; color: #666;">Select a directory to share with devices on your local network</p>
+            <input type="text" id="shareDir" placeholder="e.g., C:\Users\YourName\Downloads" style="width: 100%; padding: 12px; margin-top: 15px; border: 1px solid #ddd; border-radius: 8px;">
+            <button class="btn" onclick="createSession()">Create Session & Generate QR Code</button>
+        </div>
+        
+        <!-- QR Code Display -->
+        <div id="qrDisplay" class="card hidden">
+            <h2>Scan to Connect</h2>
+            <p style="margin-top: 10px; color: #666;">Scan this QR code with your mobile device</p>
+            <div id="qrCodes" class="qr-container"></div>
+            <p style="text-align: center; margin-top: 15px; color: #666; font-size: 14px;">
+                Or manually open one of the URLs on your device
+            </p>
+        </div>
+        
+        <!-- File Browser -->
+        <div id="fileBrowser" class="card hidden">
+            <h2>Shared Files</h2>
+            <p id="currentPath" style="margin-top: 10px; color: #666;"></p>
+            <ul id="fileList" class="file-list" style="margin-top: 20px;"></ul>
+            
+            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                <p style="font-size: 18px;">📁 Drop files here or click to upload</p>
+                <p style="color: #666; margin-top: 5px;">Files will be saved to shared directory</p>
+            </div>
+            <input type="file" id="fileInput" style="display: none;" onchange="uploadFile()">
+        </div>
+    </div>
+    
+    <script>
+        let currentSession = null;
+        
+        async function createSession() {
+            const shareDir = document.getElementById('shareDir').value;
+            const response = await fetch('/api/session/create', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ shareDir })
+            });
+            
+            const data = await response.json();
+            currentSession = data.sessionId;
+            
+            document.getElementById('createSession').classList.add('hidden');
+            document.getElementById('qrDisplay').classList.remove('hidden');
+            document.getElementById('fileBrowser').classList.remove('hidden');
+            
+            const qrDiv = document.getElementById('qrCodes');
+            qrDiv.innerHTML = '';
+            data.qrCodes.forEach((qr, i) => {
+                const img = document.createElement('img');
+                img.src = qr;
+                img.className = 'qr-code';
+                img.alt = 'QR Code';
+                qrDiv.appendChild(img);
+                const urlP = document.createElement('p');
+                urlP.textContent = data.urls[i];
+                urlP.style.fontSize = '12px';
+                urlP.style.wordBreak = 'break-all';
+                qrDiv.appendChild(urlP);
+            });
+            
+            loadFiles();
+        }
+        
+        async function loadFiles(path = '') {
+            const response = await fetch(`/api/files?session=${currentSession}&path=${encodeURIComponent(path)}`);
+            const data = await response.json();
+            
+            document.getElementById('currentPath').textContent = data.currentPath ? `Path: ${data.currentPath}` : 'Path: /';
+            
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '';
+            
+            if (data.currentPath) {
+                const upItem = document.createElement('li');
+                upItem.className = 'file-item';
+                upItem.innerHTML = `<span class="file-name">⬆️ .. (Go up)</span>`;
+                upItem.onclick = () => {
+                    const parent = data.currentPath.split('/').slice(0, -1).join('/');
+                    loadFiles(parent);
+                };
+                fileList.appendChild(upItem);
+            }
+            
+            data.files.forEach(file => {
+                const li = document.createElement('li');
+                li.className = 'file-item';
+                if (file.isDirectory) {
+                    li.innerHTML = `<span class="file-name">📁 ${file.name}</span>`;
+                    li.onclick = () => loadFiles(file.path);
+                } else {
+                    li.innerHTML = `<span class="file-name">📄 ${file.name}</span><button class="download-btn" onclick="downloadFile('${file.path.replace(/'/g, "\\'")}')">Download</button>`;
+                }
+                fileList.appendChild(li);
+            });
+        }
+        
+        function downloadFile(filePath) {
+            window.location.href = `/api/download?session=${currentSession}&file=${encodeURIComponent(filePath)}`;
+        }
+        
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file) return;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('session', currentSession);
+            
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response.ok) {
+                alert('File uploaded successfully!');
+                loadFiles(document.getElementById('currentPath').textContent.replace('Path: ', '') || '');
+            } else {
+                alert('Upload failed');
+            }
+            
+            fileInput.value = '';
+        }
+        
+        // Check for session in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionParam = urlParams.get('session');
+        if (sessionParam) {
+            currentSession = sessionParam;
+            document.getElementById('createSession').classList.add('hidden');
+            document.getElementById('fileBrowser').classList.remove('hidden');
+            loadFiles();
+        }
+    </script>
+</body>
+</html>
